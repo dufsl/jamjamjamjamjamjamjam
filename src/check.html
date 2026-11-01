@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>Проверка правил</title><pre id="out"></pre><script src="model.js"></script><script src="campaign.js"></script><script>
+let passed=0;const out=document.getElementById('out');function test(name,f){try{if(!f())throw Error('assertion');passed++;out.textContent+='PASS '+name+'\n';}catch(e){out.textContent+='FAIL '+name+': '+e.message+'\n';}}function advance(g,t){for(let i=0;i<t*4;i++)g.tick(.25);}
+test('Пустое и повреждённое сохранение',()=>new Silk.Game(null).s.silk===65&&new Silk.Game({}).s.hp===100);
+test('Ловля и ручной сбор',()=>{let g=new Silk.Game();advance(g,8);g.collect(0);return g.s.food===30&&g.s.silk===68;});
+test('Покупка и списание',()=>{let g=new Silk.Game();return g.buy('build',0,1)&&g.s.silk===41&&!g.buy('build',1,2);});
+test('Автоматический сбор',()=>{let g=new Silk.Game();g.buy('crew',0);advance(g,10);return g.s.caught===1&&g.s.food===8;});
+test('Укрытие снижает урон',()=>{let g=new Silk.Game();g.protect();g.hit();return g.s.hp>95&&g.s.raids===1;});
+test('Пылесос удаляет коконы',()=>{let g=new Silk.Game();g.s.raids=1;g.s.webs[0].ready=3;g.hit();return g.s.webs[0].ready===0;});
+test('Аэрозоль останавливает производство',()=>{let g=new Silk.Game();g.s.raids=2;g.hit();advance(g,5);return g.s.poison>6&&g.s.webs[0].progress===0;});
+test('Ремонт восстанавливает сети',()=>{let g=new Silk.Game();g.hit();g.repair();return g.s.hp===100&&g.s.webs[0].hp===100;});
+test('Поражение и остановка времени',()=>{let g=new Silk.Game();g.s.hp=1;g.hit();let t=g.s.time;advance(g,5);return g.s.status==='lost'&&g.s.time===t;});
+test('Победа через реальную покупку',()=>{let g=new Silk.Game();g.s.unlocked=4;g.s.time=3000;g.s.food=10000;g.s.silk=10000;for(let i=0;i<12;i++)g.buy('tech',i);for(let i=1;i<6;i++)g.buy('build',0,i);g.s.raids=49;g.protect();g.hit();return g.s.status==='won';});
+test('Сохранение и восстановление',()=>{let g=new Silk.Game();g.s.food=30;g.buy('crew',1);let s=JSON.parse(JSON.stringify(g.s));return Silk.valid(s)&&new Silk.Game(s).s.crew[1]===1;});
+test('Ткач производит шёлк',()=>{let g=new Silk.Game();g.s.food=30;g.buy('crew',1);advance(g,4);return g.s.silk===69;});
+out.textContent+='ИТОГО: '+passed+'/12\n';
+</script><script src="campaign-tests.js"></script>

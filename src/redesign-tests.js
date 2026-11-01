@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('fs'),vm=require('vm');global.window=global;for(const f of ['model','campaign','progression','cards'])vm.runInThisContext(fs.readFileSync(__dirname+'/'+f+'.js','utf8'));
+let passed=0;function test(n,f){if(!f())throw Error(n);console.log('PASS '+n);passed++;}function advance(g,t){for(let i=0;i<t*4;i++)g.tick(.25);}
+test('Миграция v2 без потери экономики',()=>{let g=new Silk.Game();g.s.food=234;let s=JSON.parse(JSON.stringify(g.s));delete s.meta;let n=new Silk.Game(s);return n.s.food===234&&n.s.webs[0].type===0&&Silk.valid(n.s);});
+test('Базовые цены и ловля сохранены',()=>{let g=new Silk.Game();advance(g,8);g.collect(0);return g.s.food===30&&g.s.silk===68&&g.price('build',0)===24;});
+test('Уровень блокирует комнаты и ловушки',()=>{let g=new Silk.Game();g.s.silk=500;return g.travelReason(1)==='Уровень 3'&&g.locked('build',1)==='Уровень 2';});
+test('Уровни дают награды ровно один раз',()=>{let g=new Silk.Game();g.gainXP(120);let silk=g.s.silk;g.gainXP(0);return g.level()===3&&g.s.meta.packs===3&&g.s.silk===silk&&g.events.filter(e=>e.type==='level').length===2;});
+test('Открытие комнаты и сохранение сетей',()=>{let g=new Silk.Game();g.gainXP(120);g.s.silk=500;g.s.webs[0].ready=2;return g.travel(1)&&g.travel(0)&&g.s.webs[0].ready===2;});
+test('Сто нападений не обнуляют игру и сети',()=>{let g=new Silk.Game();for(let i=0;i<100;i++)g.hit();return g.s.status==='playing'&&g.s.hp>=1&&g.s.webs[0]&&g.s.raids===100&&Silk.valid(g.s);});
+test('Укрытие уменьшает повреждения',()=>{let a=new Silk.Game(),b=new Silk.Game();a.protect();a.hit();b.hit();return a.s.webs[0].hp>b.s.webs[0].hp;});
+test('Паки, коллекция и бонусы сохраняются',()=>{let g=new Silk.Game();g.gainXP(30);let result=g.openPack(),n=new Silk.Game(JSON.parse(JSON.stringify(g.s)));return result.length===3&&Object.keys(n.s.meta.cards).length>0&&Silk.valid(n.s);});
+test('Задания нельзя получить дважды',()=>{let g=new Silk.Game();g.s.caught=10;return g.claimQuest('c10')&&!g.claimQuest('c10');});
+test('Ежедневный бонус нельзя получить дважды',()=>{let g=new Silk.Game();return g.dailyBonus()&&!g.dailyBonus();});
+test('Улучшение комнаты увеличивает доход',()=>{let g=new Silk.Game(),n=g.income(0);return g.upgradeRoom(0)&&g.income(0)>n;});
+test('Старое поражение восстанавливается',()=>{let g=new Silk.Game(),s=JSON.parse(JSON.stringify(g.s));s.status='lost';s.hp=0;return new Silk.Game(s).s.status==='playing'&&new Silk.Game(s).s.hp===1;});
+test('Покупка повышает фактическую выплату и совпадает с прогнозом',()=>{let a=new Silk.Game(),b=new Silk.Game(),pred=b.roomStats(0,1).income;b.upgradeRoom(0);a.s.webs[0].ready=b.s.webs[0].ready=1;let x=a.s.silk,y=b.s.silk;a.collect(0);b.collect(0);return b.s.silk-y>a.s.silk-x&&Math.abs(pred-b.income(0))<1e-10;});
+test('Недостаток средств не списывает ресурсы',()=>{let g=new Silk.Game();g.s.silk=0;return !g.upgradeRoom(0)&&g.s.meta.upgrades[0]===0&&g.s.silk===0;});
+test('Девять карт, одна награда и защита повторного выбора',()=>{let g=new Silk.Game();g.gainXP(30);let count=g.s.meta.packs,p=g.beginPack(),amber=g.s.meta.amber;if(p.cards.length!==9||g.s.meta.packs!==count-1)return false;let n=new Silk.Game(JSON.parse(JSON.stringify(g.s)));return n.beginPack().cards.join()===p.cards.join()&&n.choosePack(4)&&!n.choosePack(3)&&n.s.meta.amber===amber+3&&Object.values(n.s.meta.cards).reduce((a,b)=>a+b,0)===1&&n.finishPack();});
+test('Умения покупаются и тратят заряд один раз',()=>{let g=new Silk.Game();g.gainXP(30);let a=g.s.meta.amber;if(!g.buyAbility(36)||g.s.meta.amber!==a-8||!g.useAbility(36)||g.useAbility(36))return false;advance(g,2);return g.s.meta.haste>42&&g.s.webs[0].progress>3.9;});
+test('Отпугивание отменяет предупреждение и сдвигает уборку',()=>{let g=new Silk.Game();g.gainXP(30);g.s.meta.skills[37]=1;g.s.timer=4;g.s.warning=true;return g.useAbility(37)&&!g.s.warning&&g.s.timer===44;});
+test('Двойной обед удваивает фактическую добычу',()=>{let g=new Silk.Game();g.s.meta.double=20;g.s.webs[0].ready=1;let f=g.s.food,s=g.s.silk;g.collect(0);return g.s.food-f===10&&g.s.silk-s===6;});
+test('Старые карточки и новые умения переживают загрузку',()=>{let g=new Silk.Game();g.s.meta.cards[5]=2;g.s.meta.skills[38]=3;g.s.meta.double=14;let n=new Silk.Game(JSON.parse(JSON.stringify(g.s)));return n.s.meta.cards[5]===2&&n.s.meta.skills[38]===3&&n.s.meta.double===14&&Silk.valid(n.s);});
+console.log('ИТОГО '+passed+' проверок');
